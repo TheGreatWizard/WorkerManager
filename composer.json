@@ -1,12 +1,31 @@
 {
-  "name": "vendor_name/package_name",
-  "description": "description_text",
-  "minimum-stability": "stable",
+  "name": "the-great-wizard/worker-manager",
+  "description": "Object oriented Job queue manager and worker based on RabbitMQ and PHP",
+  "minimum-stability": "dev",
   "license": "proprietary",
   "authors": [
     {
-      "name": "author's name",
-      "email": "email@example.com"
+      "name": "Grigory Ilizirov",
+      "email": "sguyalef@gmail.com"
     }
-  ]
+  ],
+  "require": {
+    "react/http": ">=0.3.0",
+    "react/react": ">=0.3.0",
+    "evenement/evenement": ">=2.0",
+    "react/event-loop": ">=0.4.0",
+    "react/stream": ">=0.4.2",
+    "react/child-process": ">=0.4.0",
+    "php-amqplib/php-amqplib": ">=2.5.0",
+    "facebook/webdriver": "dev-master",
+    "psr/log": "1.0.*",
+    "monolog/monolog": "1.22.*"
+  },
+  "autoload": {
+    "psr-4": {
+      "Workers\\": "src/Workers",
+      "Startup\\": "src/Startup",
+      "Test\\": "src/test"
+    }
+  }
 }
