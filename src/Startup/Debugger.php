@@ -18,7 +18,7 @@ use Monolog\Handler\StreamHandler;
         if (!DEBUG) return;
         if (self::$log===null) {
             self::$log = new Logger('name');
-            self::$log->pushHandler(new StreamHandler('C:/wamp64/www/TTS/WorkerManager/log.txt', Logger::DEBUG));
+            self::$log->pushHandler(new StreamHandler(__DIR__ . '/../../log.txt', Logger::DEBUG));
         }
         self::$log->log(100,var_export($my_var, true));
     }
