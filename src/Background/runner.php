@@ -6,6 +6,7 @@ if (isset($argv[1])) {
     }
 }
 
+
 chdir(__DIR__);
 $bootstrap = isset($bootstrap) ? $bootstrap : __DIR__ . '/../../bootstrap.php';
 
@@ -14,16 +15,17 @@ require $bootstrap;
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Message\AMQPMessage;
 use Startup\Debugger;
+use \Workers\Manager;
 
-$queue_name = "tube";
-$rabbit_host = "localhost";
-$rabbit_port = 5672;
+$queueName = $argv[2] ?? Manager::DEFAULT_QUEUE_NAME;
+$rabbitHost = $argv[3] ?? Manager::DEFAULT_RABBIT_HOST;
+$rabbitPort = $argv[4] ?? Manager::DEFAULT_RABBIT_PORT;
 
-$connection = new AMQPStreamConnection($rabbit_host, $rabbit_port, 'guest', 'guest');
+$connection = new AMQPStreamConnection($rabbitHost, $rabbitPort, 'guest', 'guest');
 $channel = $connection->channel();
-$channel->queue_declare($queue_name, false, false, false, false);
+$channel->queue_declare($queueName, false, false, false, false);
 
-$callback = function ($msg) use ($queue_name, $channel) {
+$callback = function ($msg) use ($queueName, $channel) {
     $cmd = null;
     chdir(__DIR__);
     Debugger::debug("WORKER CALLBACK[" . getmypid() . "], started running: {$msg->body}");
@@ -42,13 +44,13 @@ $callback = function ($msg) use ($queue_name, $channel) {
 
     if ($cmd === "republish") {
         $msg = new AMQPMessage($msg->body, array('delivery_mode' => 2));
-        $channel->basic_publish($msg, '', $queue_name);
+        $channel->basic_publish($msg, '', $queueName);
     }
 
 };
 
 $channel->basic_qos(null, 1, null);
-$channel->basic_consume($queue_name, '', false, true, false, false, $callback);
+$channel->basic_consume($queueName, '', false, true, false, false, $callback);
 
 Debugger::debug("WORKER PROCESS[" . getmypid() . "], started...");
 

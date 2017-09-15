@@ -1,25 +1,14 @@
 <?php
-/**
- * Created by PhpStorm.
- * User: sguya
- * Date: 8/12/2017
- * Time: 6:49 PM
- */
 
 namespace Workers;
 
 
-class WrReport extends Work
+class WrReport implements IWork
 {
     public $msg;
-    public $k;
-
-
-
 
     public function __construct($k)
     {
-        $this->k = $k;
         $this->msg = "K = $k";
     }
 

@@ -9,15 +9,18 @@ use Startup\Debugger;
 
 class Manager
 {
-    const DEFAULT_WORKER = __DIR__ . "/../Background/worker.php";
+    const DEFAULT_RUNNER = __DIR__ . "/../Background/runner.php";
     const DEFAULT_BOOTSTRAP = __DIR__ . "/../../bootstrap.php";
-    const PID = "PID.txt";
+    const DEFAULT_QUEUE_NAME = "tube";
+    const DEFAULT_RABBIT_HOST = "localhost";
+    const DEFAULT_RABBIT_PORT = 5672;
+    public $pid;
 
     public $channel;
     public $connection;
-    public $queue_name;
-    public $rabbit_host;
-    public $rabbit_port;
+    public $queueName;
+    public $rabbitHost;
+    public $rabbitPort;
 
 
     public function __destruct()
@@ -30,57 +33,65 @@ class Manager
         }
     }
 
-    public function __construct($workerPath = null, $bootstrapPath = null)
-    {
-        $this->queue_name = "tube";
-        $this->rabbit_host = "localhost";
-        $this->rabbit_port = 5672;
+    //public function __construct($workerPath = null, $bootstrapPath = null)
 
-        $this->workerPath = isset($workerPath) ? $workerPath : self::DEFAULT_WORKER;
-        $this->bootstrapPath = isset($bootstrapPath) ? $bootstrapPath : self::DEFAULT_BOOTSTRAP;
+    public function __construct($args = [])
+    {
+        $this->workerPath = $args['workerPath'] ?? self::DEFAULT_RUNNER;
+        $this->bootstrapPath = $args['bootstrapPath'] ??  self::DEFAULT_BOOTSTRAP;
+        $this->queueName = $args['queueName'] ?? self::DEFAULT_QUEUE_NAME;
+        $this->rabbitHost = $args['rabbitHost'] ?? self::DEFAULT_RABBIT_HOST;
+        $this->rabbitPort = $args['rabbitPort'] ?? self::DEFAULT_RABBIT_PORT;
     }
 
-    public function start()
+    public function pid($name = "")
+    {
+        return "PID_{$this->queueName}_{$name}.txt";
+    }
+
+    private function isProcessExists($pid)
+    {
+        if (PHP_OS == "WINNT") {
+            exec('tasklist /NH /FI "PID eq ' . $pid . '"', $out);
+            if (strpos($out[count($out) - 1], "php.exe") !== false) {
+                return true;
+            } else {
+                return false;
+            }
+        } elseif (PHP_OS == "Linux") {
+            exec("ps $pid | grep $pid -o", $out);
+            if (strlen($out[0]) > 0) {
+                return true;
+            } else {
+                return false;
+            }
+        } else {
+            throw new \Exception("background process not implemented for " . PHP_OS . " OS");
+        }
+    }
+
+
+    public function start($runnerName = "")
     {
         Debugger::debug("------------ start ----------------");
 
         $onCreate = true;
         // is pid/txt exists
-        if (file_exists(self::PID)) {
+        if (file_exists($this->pid($runnerName))) {
             Debugger::debug("pid exits");
-            $pid = file_get_contents("PID.txt");
+            $pid = file_get_contents($this->pid($runnerName));
             Debugger::debug("pid=$pid");
-
-            Debugger::debug("PHP_OS ==" . PHP_OS);
-            if (PHP_OS == "WINNT") {
-                exec('tasklist /NH /FI "PID eq ' . $pid . '"', $out);
-                if (strpos($out[count($out) - 1], "php.exe") !== false) {
-                    Debugger::debug("no need to create new process");
-                    $onCreate = false;
-                } else {
-                    Debugger::debug("the process $pid not found:" . json_encode($out));
-
-                }
-            } elseif (PHP_OS == "Linux") {
-                exec("ps $pid | grep $pid -o", $out);
-                if (strlen($out[0]) > 0) {
-                    Debugger::debug("no need to create new process");
-                    $onCreate = false;
-                }
-            } else {
-                throw new \Exception("background process not implemented for " . PHP_OS . " OS");
-            }
+            $onCreate = !$this->isProcessExists($pid);
         }
 
         // is task exits
         if ($onCreate) {
+            $argv = implode(" ", [$this->workerPath, $this->bootstrapPath, $this->queueName, $this->rabbitHost, $this->rabbitPort]);
             if (PHP_OS == "WINNT") {
-                //cmd /C > C:\wamp64\www\TTS\FOW\output.txt 2>&1
-                exec('wmic process call create "php ' .
-                    $this->workerPath . ' ' . $this->bootstrapPath . '" | find "ProcessId"', $out);
+                exec('wmic process call create "php ' . $argv . '" | find "ProcessId"', $out);
                 $pid = intval(preg_replace("/[^0-9]/", "", $out[count($out) - 1]));
             } elseif (PHP_OS == "Linux") {
-                $cmd = "php " . $this->workerPath . ' ' . $this->bootstrapPath;
+                $cmd = "php " . $argv;
                 exec(sprintf("%s > /dev/null 2>&1 & echo $!", $cmd), $out);
                 $pid = intval($out[0]);
             } else {
@@ -88,23 +99,24 @@ class Manager
             }
 
             Debugger::debug("new process create with pid=$pid");
-            file_put_contents(self::PID, strval($pid));
+            file_put_contents($this->pid($runnerName), strval($pid));
         }
 
         // RabbitMQ --------------------------------------------------------------------
-        $this->connection = new AMQPStreamConnection($this->rabbit_host, $this->rabbit_port, 'guest', 'guest');
+        $this->connection = new AMQPStreamConnection($this->rabbitHost, $this->rabbitPort, 'guest', 'guest');
         $this->channel = $this->connection->channel();
-        $this->channel->queue_declare($this->queue_name, false, false, false, false);
+        $this->channel->queue_declare($this->queueName, false, false, false, false);
+
     }
 
-    public function stop()
+    public function stop($runnerName = "")
     {
         Debugger::debug("------------ stop ----------------");
-        if (!file_exists(self::PID)) {
+        if (!file_exists($this->pid($runnerName))) {
             Debugger::debug("no pid file");
             return;
         }
-        $pid = file_get_contents(self::PID);
+        $pid = file_get_contents($this->pid($runnerName));
         if (PHP_OS == "WINNT") {
             exec('taskkill /pid ' . $pid);
         } elseif (PHP_OS == "Linux") {
@@ -113,7 +125,8 @@ class Manager
             throw new \Exception("background process not implemented for " . PHP_OS . " OS");
         }
         Debugger::debug("process killed pid=$pid");
-        unlink("PID.txt");
+        unlink($this->pid($runnerName));
+
     }
 
     public function stopAll()
@@ -125,14 +138,38 @@ class Manager
         } else {
             throw new \Exception("background process not implemented for " . PHP_OS . " OS");
         }
+
+        array_map('unlink', glob($this->pid("*")));
     }
 
-    public function add(Work $w)
+    public function getRunners()
+    {
+        $runners = [];
+        $pidFiles = glob($this->pid("*"));
+        foreach ($pidFiles as $pidFile) {
+            $pid = file_get_contents($pidFile);
+            if ($this->isProcessExists($pid)) {
+                $runner = explode("_", $pidFile)[2];
+                $runners[] = $runner;
+            } else {
+                unlink($pidFile);
+            }
+
+        }
+        return $runners;
+    }
+
+
+    public function add(IWork $w)
     {
         $val_json = serialize($w);
         $msg = new AMQPMessage($val_json, array('delivery_mode' => 2));
-        $this->channel->basic_publish($msg, '', $this->queue_name);
-        Debugger::debug("MANAGER, sending to queue named :{$this->queue_name} the content:$val_json");
+        $this->channel->basic_publish($msg, '', $this->queueName);
+        Debugger::debug("MANAGER, sending to queue named :{$this->queueName} the content:$val_json");
     }
 
+    public function deleteQueue()
+    {
+        $this->channel->queue_delete($this->queueName);
+    }
 }

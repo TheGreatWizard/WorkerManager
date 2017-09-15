@@ -9,7 +9,7 @@
 namespace Workers;
 
 
-abstract class Work
+interface IWork
 {
-  abstract function run();
+   function run();
 }

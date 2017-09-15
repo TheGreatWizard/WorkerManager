@@ -1,20 +1,16 @@
 <?php
-/**
- * Created by PhpStorm.
- * User: sguya
- * Date: 9/2/2017
- * Time: 12:39 PM
- */
 
-
-use HighDal\HighDal;
-use HighDal\Identifier;
 use PHPUnit\Framework\TestCase;
 use Workers\Manager;
 use Test\TestObj;
 
 class ManagerTest extends TestCase
 {
+
+    /**
+     * @var Manager
+     */
+    public $m;
 
     public function catch_fatal_error()
     {
@@ -28,28 +24,29 @@ class ManagerTest extends TestCase
     public function setUp()
     {
         register_shutdown_function([$this, 'catch_fatal_error']);
-        $this->fn = 'C:\wamp64\www\TTS\FOW\src\Background\output_log.txt';
+        $this->fn = 'C:\wamp64\www\TTS\WorkerManager\src\Background\output_log.txt';
         if (file_exists($this->fn)) {
             unlink($this->fn);
         }
+
+
     }
 
-    public function testStop()
+    /**
+     * @return mixed
+     */
+    public function tearDown()
     {
-        $m = new Manager();
-        //$m->stopAll();
-        $m->start();
-        $m->start();
-        unset($m);
+
     }
+
 
     public function testWorkerReport()
     {
         $m = new Manager();
-        $m->stop();
         $m->start();
-        $w1 = new \Workers\WrReport(11);
-        $w2 = new \Workers\WrReport(102);
+        $w1 = new \Workers\WrReport(210);
+        $w2 = new \Workers\WrReport(220);
         $m->add($w1);
         $m->add($w2);
         $c = 0;
@@ -57,120 +54,150 @@ class ManagerTest extends TestCase
             time_nanosleep(1, 2000);
             $c++;
         }
-        echo $c . "\n";
-        echo file_get_contents($this->fn);
-    }
+        $this->assertTrue($c < 20, "took more then 20 seconds, to perform work");
+        $content = file_get_contents($this->fn);
+        $this->assertTrue(strpos($content, "K = 220") !== false);
 
-
-    public function testWorkerMySql1()
-    {
-
-        $m = new Manager();
-        $m->start();
-        $m->stop();
-        $m->start();
-        $w1 = new \Workers\WrTestMySql(123);
-        $m->add($w1);
-
-
-        $c = 0;
-        while ((!file_exists($this->fn)) && ($c < 10)) {
-            time_nanosleep(1, 2000);
-            $c++;
-        }
-        echo $c . "\n";
-        echo file_get_contents($this->fn);
         $m->stop();
     }
 
-    public function testWorkerMySql2()
+    public function testTwoQueues()
     {
-        $t = new TestObj(100);
-        $hd = new HighDal();
-        $hd->save($t);
-        $i = new Identifier($t);
-        $t2 = $hd->load($i);
-        assert($t->k == $t2->k);
+        $m1 = new Manager(["queueName" => "one"]);
+        $m1->start();
 
-
-        $m = new Manager();
-        $m->start();
-        $m->stop();
-        $m->start();
-        $w1 = new \Workers\WrTestMySql(123);
-        $m->add($w1);
-
-
-        $c = 0;
-        while ((!file_exists($this->fn)) && ($c < 10)) {
-            time_nanosleep(1, 2000);
-            $c++;
+        $m2 = new Manager(["queueName" => "two"]);
+        $m2->start();
+        for ($k = 0; $k < 10; $k++) {
+            $w1 = new \Workers\WrReport(300 + $k);
+            $w2 = new \Workers\WrReport(400 + $k);
+            $m1->add($w1);
+            $m2->add($w2);
         }
-        echo $c . "\n";
-        echo file_get_contents($this->fn);
-        $m->stop();
-    }
 
 
-    public function testWorkerMySql3()
-    {
-        $t = new TestObj(100);
-        $hd = new HighDal();
-        $hd->save($t);
-        $i = new Identifier($t);
-        $t2 = $hd->load($i);
-        $this->assertEquals($t->k, $t2->k);
-
-
-        $m = new Manager();
-        $m->start();
-        $m->stop();
-        $m->start();
-        $w1 = new \Workers\WrTestMySql(123);
-        $m->add($w1);
-
-
-        $c = 0;
-        while ((!file_exists($this->fn)) && ($c < 10)) {
-            time_nanosleep(1, 2000);
-            $c++;
-        }
-        echo $c . "\n";
-        echo file_get_contents($this->fn);
-        $m->stop();
-
-        $t = new TestObj(101);
-        $hd = new HighDal();
-        $hd->save($t);
-        $i = new Identifier($t);
-        $t2 = $hd->load($i);
-        $this->assertEquals($t->k, $t2->k);
-    }
-
-
-    public function testWorkerMySql4()
-    {
-
-        $m = new Manager();
-        $m->start();
-        $m->stop();
-        $m->start();
-        $w11 = new \Workers\WrTestMySql(123);
-        $w12 = new \Workers\WrTestMySql(124);
-        $m->add($w11);
-        $m->add($w12);
-
-
-        $c = 0;
-        while ((!file_exists($this->fn)) && ($c < 10)) {
-            sleep(1);
-            $c++;
-        }
         sleep(1);
-        echo $c . "\n";
-        echo file_get_contents($this->fn);
-        $m->stop();
+        $c = 0;
+        while ((!file_exists($this->fn)) && ($c < 10)) {
+            time_nanosleep(1, 2000);
+            $c++;
+        }
+        $this->assertTrue($c < 10, "took more then 10 seconds, to perform work");
+        $content = file_get_contents($this->fn);
 
+        $this->assertEquals(20, substr_count($content, "\n"));
+        $m1->stop();
+        $m2->stop();
+    }
+
+    public function testTwoRunners()
+    {
+        $m1 = new Manager();
+        $m1->start("kuzia");
+        $m1->start("gugu");
+        for ($k = 0; $k < 10; $k++) {
+            $w1 = new \Workers\WrReport(300 + $k);
+            $w2 = new \Workers\WrReport(400 + $k);
+            $m1->add($w1);
+            $m1->add($w2);
+        }
+
+
+        sleep(1);
+        $c = 0;
+        while ((!file_exists($this->fn)) && ($c < 10)) {
+            time_nanosleep(1, 2000);
+            $c++;
+        }
+        $this->assertTrue($c < 10, "took more then 10 seconds, to perform work");
+        $content = file_get_contents($this->fn);
+
+        $this->assertEquals(20, substr_count($content, "\n"));
+        $m1->stop("kuzia");
+        $m1->stop("gugu");
+    }
+
+    public function testManyRunners()
+    {
+        $m1 = new Manager();
+        $m1->start("kuzia");
+        $m1->start("gugu");
+        $m1->start("gaga");
+
+        $this->assertEquals(["kuzia", "gugu", "gaga"], $m1->getRunners());
+
+        sleep(1);
+        $m1->stopAll();
+        $this->assertEquals([], $m1->getRunners());
+    }
+
+    public function test000()
+    {
+        $k = 10;
+        $w1 = new \Workers\WrReport(300 + $k);
+        $w2 = new \Workers\WrReport(400 + $k);
+        $wList = new \Workers\WorkerList();
+        $wList->addWorker($w1);
+        $wList->addWorker($w2);
+        var_dump($wList->workers);
+        $s = serialize($wList);
+        $wL = unserialize($s);
+        var_dump($wL->workers);
+    }
+
+
+    public function testWorkerList()
+    {
+        $m1 = new Manager();
+        $m1->start("kuzia");
+        $m1->start("gugu");
+        for ($k = 0; $k < 10; $k++) {
+            $w1 = new \Workers\WrReport(300 + $k);
+            $w2 = new \Workers\WrReport(400 + $k);
+            $wList = new \Workers\WorkerList();
+            $wList->addWorker($w1);
+            $wList->addWorker($w2);
+            $m1->add($wList);
+        }
+
+
+        sleep(1);
+        $c = 0;
+        while ((!file_exists($this->fn)) && ($c < 10)) {
+            time_nanosleep(1, 2000);
+            $c++;
+        }
+        $this->assertTrue($c < 10, "took more then 10 seconds, to perform work");
+        $content = file_get_contents($this->fn);
+
+        $this->assertEquals(20, substr_count($content, "\n"));
+        $m1->stop("kuzia");
+        $m1->stop("gugu");
+    }
+
+    public function testRepublish()
+    {
+        unlink('C:\wamp64\www\TTS\WorkerManager\src\Background\state.txt');
+        $m = new Manager();
+        $m->start();
+        $arr = range(1, 10);
+        shuffle($arr);
+        foreach ($arr as $k) {
+            $w = new Workers\WrRepublisher($k);
+            $m->add($w);
+        }
+
+        sleep(5);
+        $c = 0;
+        while ((!file_exists($this->fn)) && ($c < 10)) {
+            time_nanosleep(1, 2000);
+            $c++;
+        }
+        $this->assertTrue($c < 10, "took more then 10 seconds, to perform work");
+        $content = file_get_contents('C:\wamp64\www\TTS\WorkerManager\src\Background\state.txt');
+
+        $this->assertEquals(10, $content);
+        $m->stop();
 
     }
 }
