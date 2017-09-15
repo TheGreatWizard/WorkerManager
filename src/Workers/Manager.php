@@ -134,7 +134,19 @@ class Manager
         if (PHP_OS == "WINNT") {
             exec('taskkill /FI "SESSION eq 1" /FI "IMAGENAME eq php.exe');
         } elseif (PHP_OS == "Linux") {
-            throw new \Exception("stopAll() not implemented for " . PHP_OS . " OS");
+            exec("ps -ef | grep \"runner.php\" | grep -v \"grep\"", $out);
+
+            foreach ($out as $str) {
+                $parts = explode(" ", $str);
+                foreach ($parts as $part) {
+                    if (preg_match("/^[1-9][0-9]*$/", $part)) {
+                        $pid = strval($part);
+                        exec(sprintf("kill -9 %s", $pid));
+                        break;
+                    }
+                }
+            }
+
         } else {
             throw new \Exception("background process not implemented for " . PHP_OS . " OS");
         }
@@ -149,7 +161,7 @@ class Manager
         foreach ($pidFiles as $pidFile) {
             $pid = file_get_contents($pidFile);
             if ($this->isProcessExists($pid)) {
-                $runner = str_replace(".txt","", explode("_", $pidFile)[2]);
+                $runner = str_replace(".txt", "", explode("_", $pidFile)[2]);
                 $runners[] = $runner;
             } else {
                 unlink($pidFile);
