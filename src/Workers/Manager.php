@@ -149,7 +149,7 @@ class Manager
         foreach ($pidFiles as $pidFile) {
             $pid = file_get_contents($pidFile);
             if ($this->isProcessExists($pid)) {
-                $runner = explode("_", $pidFile)[2];
+                $runner = str_replace(".txt","", explode("_", $pidFile)[2]);
                 $runners[] = $runner;
             } else {
                 unlink($pidFile);

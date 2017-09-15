@@ -24,7 +24,8 @@ class ManagerTest extends TestCase
     public function setUp()
     {
         register_shutdown_function([$this, 'catch_fatal_error']);
-        $this->fn = 'C:\wamp64\www\TTS\WorkerManager\src\Background\output_log.txt';
+        $this->path = __DIR__ . '/../../../src/Background';
+        $this->fn = $this->path . '/output_log.txt';
         if (file_exists($this->fn)) {
             unlink($this->fn);
         }
@@ -32,14 +33,11 @@ class ManagerTest extends TestCase
 
     }
 
-    /**
-     * @return mixed
-     */
     public function tearDown()
     {
-
+        $m = new Manager();
+        $m->stopAll();
     }
-
 
     public function testWorkerReport()
     {
@@ -124,25 +122,11 @@ class ManagerTest extends TestCase
         $m1->start("gugu");
         $m1->start("gaga");
 
-        $this->assertEquals(["kuzia", "gugu", "gaga"], $m1->getRunners());
-
+        $this->assertEquals(["kuzia", "gugu", "gaga"], $m1->getRunners(),
+            "canonicalize = true", $delta = 0.0, $maxDepth = 10, $canonicalize = true);
         sleep(1);
         $m1->stopAll();
         $this->assertEquals([], $m1->getRunners());
-    }
-
-    public function test000()
-    {
-        $k = 10;
-        $w1 = new \Workers\WrReport(300 + $k);
-        $w2 = new \Workers\WrReport(400 + $k);
-        $wList = new \Workers\WorkerList();
-        $wList->addWorker($w1);
-        $wList->addWorker($w2);
-        var_dump($wList->workers);
-        $s = serialize($wList);
-        $wL = unserialize($s);
-        var_dump($wL->workers);
     }
 
 
@@ -177,7 +161,9 @@ class ManagerTest extends TestCase
 
     public function testRepublish()
     {
-        unlink('C:\wamp64\www\TTS\WorkerManager\src\Background\state.txt');
+        if (file_exists($this->path . '/state.txt')) {
+            unlink($this->path . '/state.txt');
+        }
         $m = new Manager();
         $m->start();
         $arr = range(1, 10);
@@ -194,7 +180,7 @@ class ManagerTest extends TestCase
             $c++;
         }
         $this->assertTrue($c < 10, "took more then 10 seconds, to perform work");
-        $content = file_get_contents('C:\wamp64\www\TTS\WorkerManager\src\Background\state.txt');
+        $content = file_get_contents($this->path . '/state.txt');
 
         $this->assertEquals(10, $content);
         $m->stop();
