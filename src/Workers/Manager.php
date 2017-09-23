@@ -47,7 +47,7 @@ class Manager
 
     public function pid($name = "")
     {
-        return "PID_{$this->queueName}_{$name}.txt";
+        return ROOT . "/PID_{$this->queueName}_{$name}.txt";
     }
 
     private function isProcessExists($pid)
@@ -133,7 +133,12 @@ class Manager
     public function stopAll()
     {
         if (PHP_OS == "WINNT") {
-            exec('taskkill /FI "SESSION eq 1" /FI "IMAGENAME eq php.exe');
+            $pids = $this->getPids();
+            foreach ($pids as $pid) {
+                exec('taskkill /f /pid ' . $pid, $out);
+                echo 'taskkill /f /pid ' . $pid . "=>$out[0]\n";
+            }
+            //exec('taskkill /FI "SESSION eq 1" /FI "IMAGENAME eq php.exe');
         } elseif (PHP_OS == "Linux") {
             exec("ps -ef | grep \"runner.php\" | grep -v \"grep\"", $out);
 
@@ -170,6 +175,22 @@ class Manager
 
         }
         return $runners;
+    }
+
+    public function getPids()
+    {
+        $pids = [];
+        $pidFiles = glob($this->pid("*"));
+        foreach ($pidFiles as $pidFile) {
+            $pid = file_get_contents($pidFile);
+            if ($this->isProcessExists($pid)) {
+                $pids[] = $pid;
+            } else {
+                unlink($pidFile);
+            }
+
+        }
+        return $pids;
     }
 
 
