@@ -1,7 +1,7 @@
 {
   "name": "the-great-wizard/worker-manager",
   "description": "Object oriented Job queue manager and worker based on RabbitMQ and PHP",
-  "minimum-stability": "dev",
+  "minimum-stability":"stable",
   "license": "proprietary",
   "authors": [
     {
@@ -17,7 +17,7 @@
     "react/stream": ">=0.4.2",
     "react/child-process": ">=0.4.0",
     "php-amqplib/php-amqplib": ">=2.5.0",
-    "facebook/webdriver": "dev-master",
+    "facebook/webdriver": "*",
     "psr/log": "1.0.*",
     "monolog/monolog": "1.22.*"
   },
