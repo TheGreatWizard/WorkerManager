@@ -28,18 +28,18 @@ $channel->queue_declare($queueName, false, false, false, false);
 $callback = function ($msg) use ($queueName, $channel) {
     $cmd = null;
     chdir(__DIR__);
-    Debugger::debug("WORKER CALLBACK[" . getmypid() . "], started running: {$msg->body}");
+    Debugger::debug("RUNNER CALLBACK[" . getmypid() . "], started running: {$msg->body}");
     try {
         $w = unserialize($msg->body);
     } catch (\Exception $e) {
-        Debugger::debug("WORKER CALLBACK[" . getmypid() . "] ERROR, unserialize: {$e->getMessage()}");
+        Debugger::debug("RUNNER CALLBACK[" . getmypid() . "] ERROR, unserialize: {$e->getMessage()}");
         return;
     }
     try {
         $cmd = $w->run();
-        Debugger::debug("WORKER CALLBACK[" . getmypid() . "], success: {$msg->body}");
+        Debugger::debug("RUNNER CALLBACK[" . getmypid() . "], success: {$msg->body}");
     } catch (\Exception $e) {
-        Debugger::debug("WORKER CALLBACK[" . getmypid() . "] ERROR, {$e->getMessage()}");
+        Debugger::debug("RUNNER CALLBACK[" . getmypid() . "] ERROR, {$e->getMessage()}");
     }
 
     if ($cmd === "republish") {
@@ -52,7 +52,7 @@ $callback = function ($msg) use ($queueName, $channel) {
 $channel->basic_qos(null, 1, null);
 $channel->basic_consume($queueName, '', false, true, false, false, $callback);
 
-Debugger::debug("WORKER PROCESS[" . getmypid() . "], started...");
+Debugger::debug("RUNNER PROCESS[" . getmypid() . "], started...");
 
 while (count($channel->callbacks)) {
     $channel->wait();
@@ -60,5 +60,5 @@ while (count($channel->callbacks)) {
 $channel->close();
 $connection->close();
 
-Debugger::debug("WORKER PROCESS[" . getmypid() . "], stopped...");
+Debugger::debug("RUNNER PROCESS[" . getmypid() . "], stopped...");
 

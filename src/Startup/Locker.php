@@ -24,8 +24,10 @@ class Locker
     public function unlock(string $key)
     {
         $path = $this->root . $key;
-        Debugger::debug("UNLOCK " . $path);
-        rmdir($path);
+        if (file_exists($path)) {
+            Debugger::debug("UNLOCK " . $path);
+            rmdir($path);
+        }
     }
 
     public function waitUntilLocked(string $key)

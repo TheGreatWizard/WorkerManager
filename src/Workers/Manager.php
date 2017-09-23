@@ -21,6 +21,7 @@ class Manager
     public $queueName;
     public $rabbitHost;
     public $rabbitPort;
+    public $bootstrapPath;
 
 
     public function __destruct()
@@ -177,11 +178,13 @@ class Manager
         $val_json = serialize($w);
         $msg = new AMQPMessage($val_json, array('delivery_mode' => 2));
         $this->channel->basic_publish($msg, '', $this->queueName);
-        Debugger::debug("MANAGER, sending to queue named :{$this->queueName} the content:$val_json");
+        Debugger::debug("MANAGER, sending to queue :{$this->queueName} the work:$val_json");
     }
 
     public function deleteQueue()
     {
-        $this->channel->queue_delete($this->queueName);
+        if (!is_null($this->channel)) {
+            $this->channel->queue_delete($this->queueName);
+        }
     }
 }
