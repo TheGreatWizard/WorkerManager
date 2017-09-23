@@ -1,7 +1,7 @@
 # WorkerManager
 Object oriented Job queue manager &amp; worker based on ReachPHP and RabbitMQ
 
-#Installation with composer
+# Installation with composer
 ```
    "require": {
         "the-great-wizard/worker-manager": "*",
